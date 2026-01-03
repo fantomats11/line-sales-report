@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -67,10 +68,10 @@ export default function ProSalesReport() {
     }
   }, [lineToken, targetId, companyName, historyList, isLoaded]);
 
-  // --- 3. Backup & Restore System ---
+  // --- 3. Backup & Restore System (New in V16) ---
   const handleExportData = () => {
       const dataToSave = {
-          version: "V20",
+          version: "V16",
           exportDate: new Date().toISOString(),
           lineToken,
           targetId,
@@ -107,6 +108,7 @@ export default function ProSalesReport() {
                   return;
               }
 
+              // Restore Process
               if(importedData.lineToken) setLineToken(importedData.lineToken);
               if(importedData.targetId) setTargetId(importedData.targetId);
               if(importedData.companyName) setCompanyName(importedData.companyName);
@@ -119,28 +121,11 @@ export default function ProSalesReport() {
           }
       };
       reader.readAsText(file);
-      e.target.value = null; 
+      e.target.value = null; // Reset input to allow same file selection
   };
 
 
   // --- 4. Helpers ---
-  const handleSmartDateChange = (e) => {
-      let val = e.target.value;
-      if (!val) {
-          setDate('');
-          return;
-      }
-      const parts = val.split('-');
-      if (parts.length === 3) {
-          let year = parseInt(parts[0]);
-          if (year > 2400) {
-              year = year - 543;
-              val = `${year}-${parts[1]}-${parts[2]}`;
-          }
-      }
-      setDate(val);
-  };
-
   const formatThaiDate = (dateString) => {
     if (!dateString) return '-';
     try {
@@ -148,16 +133,6 @@ export default function ProSalesReport() {
         return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
     } catch (e) { return dateString; }
   };
-
-  const getBuddhistYear = (dateString) => {
-      if(!dateString) return '';
-      try {
-          const year = parseInt(dateString.slice(0, 4));
-          if(isNaN(year)) return '';
-          const beYear = year < 2400 ? year + 543 : year;
-          return `(พ.ศ. ${beYear})`;
-      } catch(e) { return ''; }
-  }
 
   const isPastDate = () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -186,21 +161,6 @@ export default function ProSalesReport() {
   const removeHistoryRow = (id) => {
     if(!window.confirm('ต้องการลบรายการนี้ใช่ไหม?')) return;
     setHistoryList(prev => prev.filter(item => item.id !== id));
-  };
-
-  const updateHistoryDate = (id, rawValue) => {
-      let val = rawValue;
-      if (val) {
-          const parts = val.split('-');
-          if (parts.length === 3) {
-              let year = parseInt(parts[0]);
-              if (year > 2400) {
-                  year = year - 543;
-                  val = `${year}-${parts[1]}-${parts[2]}`;
-              }
-          }
-      }
-      setHistoryList(prev => prev.map(item => item.id === id ? { ...item, date: val } : item));
   };
 
   const updateHistoryRow = (id, field, value) => {
@@ -299,8 +259,8 @@ export default function ProSalesReport() {
     const todayGmTotal = group2.reduce((a,b)=>a+Number(b.count || 0),0);
     const todayRaw = {
         rac_fb: group1[0].count, rac_ig: group1[1].count, rac_tt: group1[2].count, rac_line: group1[3].count,
-        gm_fb: group2[0].count, gm_ig: group2[1].count, gm_tt: group2[2].count, gm_line: group2[3].count,
-      };
+        gm_fb: group2[0].count, gm_ig: group2[1].count, gm_tt: group2[2].count, gm_line: group2[3].count
+    };
 
     historyForTable.push({
         date: currentDayFormatted,
@@ -324,13 +284,9 @@ export default function ProSalesReport() {
     };
   }, [date, historyList, group1, group2]);
 
-  // --- Pagination & Sorting ---
+  // --- Pagination Logic ---
   const sortedHistoryForDisplay = useMemo(() => {
-      return [...historyList].sort((a,b) => {
-          if (!a.date) return -1;
-          if (!b.date) return 1;
-          return new Date(b.date) - new Date(a.date);
-      });
+      return [...historyList].sort((a,b) => new Date(b.date) - new Date(a.date));
   }, [historyList]);
 
   const totalPages = Math.ceil(sortedHistoryForDisplay.length / itemsPerPage);
@@ -342,7 +298,7 @@ export default function ProSalesReport() {
   const goToPrevPage = () => setCurrentPage(p => Math.max(1, p - 1));
   const goToNextPage = () => setCurrentPage(p => Math.min(totalPages, p + 1));
 
-  // --- 7. Flex Message Generator (V20: Compact Mode) ---
+  // --- 7. Flex Message Generator ---
   const generateFlex = () => {
     const thaiDate = formatThaiDate(date);
     const grandTotalAcc = accData.rac.total + accData.gm.total;
@@ -363,10 +319,9 @@ export default function ProSalesReport() {
 
     const headerColor = "#C0392B"; 
 
-    // V20: Compact Padding
     const createHeaderWithSummary = (title) => {
         return {
-            type: "box", layout: "vertical", backgroundColor: headerColor, paddingAll: "16px", // Reduced from 20px
+            type: "box", layout: "vertical", backgroundColor: headerColor, paddingAll: "20px",
             contents: [
                 { 
                     type: "box", layout: "horizontal", 
@@ -381,14 +336,13 @@ export default function ProSalesReport() {
         };
     };
 
-    // V20: Compact Rows
     const createDailyRows = (items, offset, groupTotalMtd) => items.map((p, i) => {
         const mtdVal = Number(accData.perPlatform[offset + i]) || 0;
         const safeGroupTotal = Number(groupTotalMtd) || 0;
         const percent = safeGroupTotal > 0 ? Math.round((mtdVal / safeGroupTotal) * 100) : 0;
         
         return {
-            type: "box", layout: "horizontal", spacing: "sm", margin: "xs", // Reduced margin from sm
+            type: "box", layout: "horizontal", spacing: "sm", margin: "sm",
             contents: [
                 { 
                     type: "box", layout: "horizontal", flex: 4, spacing: "sm", alignItems: "center", 
@@ -415,25 +369,25 @@ export default function ProSalesReport() {
       type: "bubble", size: "giga",
       header: createHeaderWithSummary("รายงานทักแชทลูกค้าใหม่"),
       hero: {
-          type: "box", layout: "vertical", paddingAll: "16px", backgroundColor: "#ffffff", // Reduced padding
+          type: "box", layout: "vertical", paddingAll: "20px", backgroundColor: "#ffffff",
           contents: [
              {
                  type: "box", layout: "horizontal", spacing: "md",
                  contents: [
                      { 
-                         type: "box", layout: "vertical", backgroundColor: "#F0F9FF", cornerRadius: "md", paddingAll: "12px", flex: 1, // Compact padding
+                         type: "box", layout: "vertical", backgroundColor: "#F0F9FF", cornerRadius: "md", paddingAll: "16px", flex: 1, 
                          contents: [
                              { type: "text", text: "วันนี้ (Daily)", color: "#3B82F6", size: "xxs", weight: "bold" }, 
-                             { type: "text", text: grandTotalDaily.toLocaleString(), color: "#1E3A8A", size: "xl", weight: "bold", margin: "sm" }, // Reduced font size slightly
+                             { type: "text", text: grandTotalDaily.toLocaleString(), color: "#1E3A8A", size: "xxl", weight: "bold", margin: "sm" },
                              { type: "text", text: `RAC: ${todayRac.toLocaleString()}`, color: "#64748B", size: "xxs", margin: "xs" },
                              { type: "text", text: `GM: ${todayGm.toLocaleString()}`, color: "#64748B", size: "xxs" }
                          ] 
                      },
                      { 
-                         type: "box", layout: "vertical", backgroundColor: "#F0FDF4", cornerRadius: "md", paddingAll: "12px", flex: 1, 
+                         type: "box", layout: "vertical", backgroundColor: "#F0FDF4", cornerRadius: "md", paddingAll: "16px", flex: 1, 
                          contents: [
                              { type: "text", text: "สะสม (MTD)", color: "#22C55E", size: "xxs", weight: "bold" }, 
-                             { type: "text", text: grandTotalAcc.toLocaleString(), color: "#14532D", size: "xl", weight: "bold", margin: "sm" },
+                             { type: "text", text: grandTotalAcc.toLocaleString(), color: "#14532D", size: "xxl", weight: "bold", margin: "sm" },
                              { type: "text", text: `RAC: ${racAcc.toLocaleString()}`, color: "#64748B", size: "xxs", margin: "xs" },
                              { type: "text", text: `GM: ${gmAcc.toLocaleString()}`, color: "#64748B", size: "xxs" }
                          ] 
@@ -443,7 +397,7 @@ export default function ProSalesReport() {
           ]
       },
       body: {
-          type: "box", layout: "vertical", paddingAll: "16px", backgroundColor: "#ffffff", // Reduced padding
+          type: "box", layout: "vertical", paddingAll: "20px", backgroundColor: "#ffffff",
           contents: [
             {
                 type: "box", layout: "horizontal", margin: "none",
@@ -454,32 +408,25 @@ export default function ProSalesReport() {
                 ]
             },
             { type: "separator", margin: "md", color: "#F3F4F6" },
-            // Section 1: RAC
             { 
-                type: "box", layout: "horizontal", margin: "md", alignItems: "center", 
+                type: "box", layout: "horizontal", margin: "lg", alignItems: "center", 
                 contents: [
                     { type: "text", text: "RENT A COAT", color: "#111827", weight: "bold", size: "sm", flex: 1 }, 
                     { type: "text", text: `วันนี้: ${todayRac.toLocaleString()}`, color: "#6B7280", size: "xs", align: "end" }
                 ] 
             },
             { type: "box", layout: "vertical", margin: "sm", contents: createDailyRows(group1, 0, racAcc) },
-            
-            // Middle Separator (Compact Margin)
-            { type: "separator", margin: "md", color: "#F3F4F6" }, 
-            
-            // Section 2: GO Mall
+            { type: "separator", margin: "xl", color: "#F3F4F6" },
             { 
-                type: "box", layout: "horizontal", margin: "md", alignItems: "center", 
+                type: "box", layout: "horizontal", margin: "lg", alignItems: "center", 
                 contents: [
                     { type: "text", text: "GO MALL", color: "#111827", weight: "bold", size: "sm", flex: 1 }, 
                     { type: "text", text: `วันนี้: ${todayGm.toLocaleString()}`, color: "#6B7280", size: "xs", align: "end" }
                 ] 
             },
             { type: "box", layout: "vertical", margin: "sm", contents: createDailyRows(group2, 4, gmAcc) },
-            
-            // Footer (Compact Margin)
             { 
-                type: "box", layout: "vertical", margin: "lg", alignItems: "center", // Reduced from xl/xxl
+                type: "box", layout: "vertical", margin: "xxl", alignItems: "center",
                 contents: [
                      { type: "text", text: "👉 ปัดซ้ายเพื่อดูตารางสรุปรายเดือน", size: "xxs", color: "#9CA3AF" }
                 ]
@@ -605,7 +552,7 @@ export default function ProSalesReport() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v20 (Compact Mode)</span>
+               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v16 (Complete)</span>
             </h1>
             <div className="flex items-center gap-2">
                 <span className={`text-[10px] md:text-xs px-3 py-1 rounded-full font-bold border ${isPastDate() ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
@@ -637,10 +584,8 @@ export default function ProSalesReport() {
                 <input type="text" className="w-full p-2.5 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เช่น Brandname Market" value={companyName} onChange={e => setCompanyName(e.target.value)} />
             </div>
             <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1.5 flex items-center gap-1"><Calendar size={16}/> วันที่รายงาน <span className="text-xs font-normal text-slate-400">{getBuddhistYear(date)}</span></label>
-                
-                {/* V19 Fix: ใช้ handleSmartDateChange แทน setDate */}
-                <input type="date" className={`w-full p-2.5 border rounded-md outline-none ${isPastDate() ? 'border-orange-300 bg-orange-50' : 'border-slate-200'}`} value={date} onChange={handleSmartDateChange} />
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5 flex items-center gap-1"><Calendar size={16}/> วันที่รายงาน</label>
+                <input type="date" className={`w-full p-2.5 border rounded-md outline-none ${isPastDate() ? 'border-orange-300 bg-orange-50' : 'border-slate-200'}`} value={date} onChange={e => setDate(e.target.value)} />
             </div>
         </div>
 
@@ -756,9 +701,8 @@ export default function ProSalesReport() {
                                     </div>
                                     
                                     <div className="mb-3 pr-16">
-                                        <label className="text-xs font-bold text-slate-500 block mb-1">วันที่ของข้อมูล <span className="font-normal text-slate-400">{getBuddhistYear(row.date)}</span></label>
-                                        {/* V19 Fix: ใช้ updateHistoryDate แทน input ปกติ */}
-                                        <input type="date" className="w-full p-1.5 border rounded text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none" value={row.date} onChange={(e) => updateHistoryDate(row.id, e.target.value)} />
+                                        <label className="text-xs font-bold text-slate-500 block mb-1">วันที่ของข้อมูล</label>
+                                        <input type="date" className="w-full p-1.5 border rounded text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none" value={row.date} onChange={(e) => updateHistoryRow(row.id, 'date', e.target.value)} />
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
