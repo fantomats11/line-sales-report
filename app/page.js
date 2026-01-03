@@ -70,7 +70,7 @@ export default function ProSalesReport() {
   // --- 3. Backup & Restore System ---
   const handleExportData = () => {
       const dataToSave = {
-          version: "V19",
+          version: "V20",
           exportDate: new Date().toISOString(),
           lineToken,
           targetId,
@@ -123,21 +123,16 @@ export default function ProSalesReport() {
   };
 
 
-  // --- 4. Helpers (Fixed Year Display & Auto Correct) ---
-  
-  // V19: ฟังก์ชันจัดการการเปลี่ยนวันที่ แบบฉลาด (Smart Date Handler)
+  // --- 4. Helpers ---
   const handleSmartDateChange = (e) => {
       let val = e.target.value;
       if (!val) {
           setDate('');
           return;
       }
-
-      // ตรวจสอบว่าปีมันเยอะผิดปกติไหม (เช่น ใส่ 2569 มาตรงๆ)
       const parts = val.split('-');
       if (parts.length === 3) {
           let year = parseInt(parts[0]);
-          // ถ้าปีมากกว่า 2400 แสดงว่าผู้ใช้พิมพ์ พ.ศ. ใส่เข้ามา -> แปลงเป็น ค.ศ. ให้
           if (year > 2400) {
               year = year - 543;
               val = `${year}-${parts[1]}-${parts[2]}`;
@@ -159,8 +154,6 @@ export default function ProSalesReport() {
       try {
           const year = parseInt(dateString.slice(0, 4));
           if(isNaN(year)) return '';
-          // ถ้าปีน้อยกว่า 2400 ให้บวก 543 (เพราะเป็น ค.ศ.)
-          // แต่ถ้าปีมันเยอะอยู่แล้ว (User Hack) ก็โชว์เลย
           const beYear = year < 2400 ? year + 543 : year;
           return `(พ.ศ. ${beYear})`;
       } catch(e) { return ''; }
@@ -195,7 +188,6 @@ export default function ProSalesReport() {
     setHistoryList(prev => prev.filter(item => item.id !== id));
   };
 
-  // V19 Fix: ใช้ Smart Date Change กับ History Row ด้วย
   const updateHistoryDate = (id, rawValue) => {
       let val = rawValue;
       if (val) {
@@ -332,7 +324,7 @@ export default function ProSalesReport() {
     };
   }, [date, historyList, group1, group2]);
 
-  // --- Pagination & Sorting (Standard Sort) ---
+  // --- Pagination & Sorting ---
   const sortedHistoryForDisplay = useMemo(() => {
       return [...historyList].sort((a,b) => {
           if (!a.date) return -1;
@@ -350,7 +342,7 @@ export default function ProSalesReport() {
   const goToPrevPage = () => setCurrentPage(p => Math.max(1, p - 1));
   const goToNextPage = () => setCurrentPage(p => Math.min(totalPages, p + 1));
 
-  // --- 7. Flex Message Generator ---
+  // --- 7. Flex Message Generator (V20: Compact Mode) ---
   const generateFlex = () => {
     const thaiDate = formatThaiDate(date);
     const grandTotalAcc = accData.rac.total + accData.gm.total;
@@ -371,9 +363,10 @@ export default function ProSalesReport() {
 
     const headerColor = "#C0392B"; 
 
+    // V20: Compact Padding
     const createHeaderWithSummary = (title) => {
         return {
-            type: "box", layout: "vertical", backgroundColor: headerColor, paddingAll: "20px",
+            type: "box", layout: "vertical", backgroundColor: headerColor, paddingAll: "16px", // Reduced from 20px
             contents: [
                 { 
                     type: "box", layout: "horizontal", 
@@ -388,13 +381,14 @@ export default function ProSalesReport() {
         };
     };
 
+    // V20: Compact Rows
     const createDailyRows = (items, offset, groupTotalMtd) => items.map((p, i) => {
         const mtdVal = Number(accData.perPlatform[offset + i]) || 0;
         const safeGroupTotal = Number(groupTotalMtd) || 0;
         const percent = safeGroupTotal > 0 ? Math.round((mtdVal / safeGroupTotal) * 100) : 0;
         
         return {
-            type: "box", layout: "horizontal", spacing: "sm", margin: "sm",
+            type: "box", layout: "horizontal", spacing: "sm", margin: "xs", // Reduced margin from sm
             contents: [
                 { 
                     type: "box", layout: "horizontal", flex: 4, spacing: "sm", alignItems: "center", 
@@ -421,25 +415,25 @@ export default function ProSalesReport() {
       type: "bubble", size: "giga",
       header: createHeaderWithSummary("รายงานทักแชทลูกค้าใหม่"),
       hero: {
-          type: "box", layout: "vertical", paddingAll: "20px", backgroundColor: "#ffffff",
+          type: "box", layout: "vertical", paddingAll: "16px", backgroundColor: "#ffffff", // Reduced padding
           contents: [
              {
                  type: "box", layout: "horizontal", spacing: "md",
                  contents: [
                      { 
-                         type: "box", layout: "vertical", backgroundColor: "#F0F9FF", cornerRadius: "md", paddingAll: "16px", flex: 1, 
+                         type: "box", layout: "vertical", backgroundColor: "#F0F9FF", cornerRadius: "md", paddingAll: "12px", flex: 1, // Compact padding
                          contents: [
                              { type: "text", text: "วันนี้ (Daily)", color: "#3B82F6", size: "xxs", weight: "bold" }, 
-                             { type: "text", text: grandTotalDaily.toLocaleString(), color: "#1E3A8A", size: "xxl", weight: "bold", margin: "sm" },
+                             { type: "text", text: grandTotalDaily.toLocaleString(), color: "#1E3A8A", size: "xl", weight: "bold", margin: "sm" }, // Reduced font size slightly
                              { type: "text", text: `RAC: ${todayRac.toLocaleString()}`, color: "#64748B", size: "xxs", margin: "xs" },
                              { type: "text", text: `GM: ${todayGm.toLocaleString()}`, color: "#64748B", size: "xxs" }
                          ] 
                      },
                      { 
-                         type: "box", layout: "vertical", backgroundColor: "#F0FDF4", cornerRadius: "md", paddingAll: "16px", flex: 1, 
+                         type: "box", layout: "vertical", backgroundColor: "#F0FDF4", cornerRadius: "md", paddingAll: "12px", flex: 1, 
                          contents: [
                              { type: "text", text: "สะสม (MTD)", color: "#22C55E", size: "xxs", weight: "bold" }, 
-                             { type: "text", text: grandTotalAcc.toLocaleString(), color: "#14532D", size: "xxl", weight: "bold", margin: "sm" },
+                             { type: "text", text: grandTotalAcc.toLocaleString(), color: "#14532D", size: "xl", weight: "bold", margin: "sm" },
                              { type: "text", text: `RAC: ${racAcc.toLocaleString()}`, color: "#64748B", size: "xxs", margin: "xs" },
                              { type: "text", text: `GM: ${gmAcc.toLocaleString()}`, color: "#64748B", size: "xxs" }
                          ] 
@@ -449,7 +443,7 @@ export default function ProSalesReport() {
           ]
       },
       body: {
-          type: "box", layout: "vertical", paddingAll: "20px", backgroundColor: "#ffffff",
+          type: "box", layout: "vertical", paddingAll: "16px", backgroundColor: "#ffffff", // Reduced padding
           contents: [
             {
                 type: "box", layout: "horizontal", margin: "none",
@@ -460,24 +454,32 @@ export default function ProSalesReport() {
                 ]
             },
             { type: "separator", margin: "md", color: "#F3F4F6" },
+            // Section 1: RAC
             { 
-                type: "box", layout: "horizontal", margin: "lg", alignItems: "center", 
+                type: "box", layout: "horizontal", margin: "md", alignItems: "center", 
                 contents: [
                     { type: "text", text: "RENT A COAT", color: "#111827", weight: "bold", size: "sm", flex: 1 }, 
                     { type: "text", text: `วันนี้: ${todayRac.toLocaleString()}`, color: "#6B7280", size: "xs", align: "end" }
                 ] 
             },
             { type: "box", layout: "vertical", margin: "sm", contents: createDailyRows(group1, 0, racAcc) },
-            { type: "separator", margin: "xl", color: "#F3F4F6" },
+            
+            // Middle Separator (Compact Margin)
+            { type: "separator", margin: "md", color: "#F3F4F6" }, 
+            
+            // Section 2: GO Mall
             { 
-                type: "box", layout: "horizontal", margin: "lg", alignItems: "center", 
+                type: "box", layout: "horizontal", margin: "md", alignItems: "center", 
                 contents: [
                     { type: "text", text: "GO MALL", color: "#111827", weight: "bold", size: "sm", flex: 1 }, 
                     { type: "text", text: `วันนี้: ${todayGm.toLocaleString()}`, color: "#6B7280", size: "xs", align: "end" }
                 ] 
             },
+            { type: "box", layout: "vertical", margin: "sm", contents: createDailyRows(group2, 4, gmAcc) },
+            
+            // Footer (Compact Margin)
             { 
-                type: "box", layout: "vertical", margin: "xxl", alignItems: "center",
+                type: "box", layout: "vertical", margin: "lg", alignItems: "center", // Reduced from xl/xxl
                 contents: [
                      { type: "text", text: "👉 ปัดซ้ายเพื่อดูตารางสรุปรายเดือน", size: "xxs", color: "#9CA3AF" }
                 ]
@@ -603,7 +605,7 @@ export default function ProSalesReport() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v19 (Smart Year)</span>
+               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v20 (Compact Mode)</span>
             </h1>
             <div className="flex items-center gap-2">
                 <span className={`text-[10px] md:text-xs px-3 py-1 rounded-full font-bold border ${isPastDate() ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
