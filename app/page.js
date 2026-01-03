@@ -67,10 +67,10 @@ export default function ProSalesReport() {
     }
   }, [lineToken, targetId, companyName, historyList, isLoaded]);
 
-  // --- 3. Backup & Restore System (New in V16) ---
+  // --- 3. Backup & Restore System ---
   const handleExportData = () => {
       const dataToSave = {
-          version: "V16",
+          version: "V19",
           exportDate: new Date().toISOString(),
           lineToken,
           targetId,
@@ -107,7 +107,6 @@ export default function ProSalesReport() {
                   return;
               }
 
-              // Restore Process
               if(importedData.lineToken) setLineToken(importedData.lineToken);
               if(importedData.targetId) setTargetId(importedData.targetId);
               if(importedData.companyName) setCompanyName(importedData.companyName);
@@ -120,11 +119,33 @@ export default function ProSalesReport() {
           }
       };
       reader.readAsText(file);
-      e.target.value = null; // Reset input to allow same file selection
+      e.target.value = null; 
   };
 
 
-  // --- 4. Helpers ---
+  // --- 4. Helpers (Fixed Year Display & Auto Correct) ---
+  
+  // V19: ฟังก์ชันจัดการการเปลี่ยนวันที่ แบบฉลาด (Smart Date Handler)
+  const handleSmartDateChange = (e) => {
+      let val = e.target.value;
+      if (!val) {
+          setDate('');
+          return;
+      }
+
+      // ตรวจสอบว่าปีมันเยอะผิดปกติไหม (เช่น ใส่ 2569 มาตรงๆ)
+      const parts = val.split('-');
+      if (parts.length === 3) {
+          let year = parseInt(parts[0]);
+          // ถ้าปีมากกว่า 2400 แสดงว่าผู้ใช้พิมพ์ พ.ศ. ใส่เข้ามา -> แปลงเป็น ค.ศ. ให้
+          if (year > 2400) {
+              year = year - 543;
+              val = `${year}-${parts[1]}-${parts[2]}`;
+          }
+      }
+      setDate(val);
+  };
+
   const formatThaiDate = (dateString) => {
     if (!dateString) return '-';
     try {
@@ -132,6 +153,18 @@ export default function ProSalesReport() {
         return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
     } catch (e) { return dateString; }
   };
+
+  const getBuddhistYear = (dateString) => {
+      if(!dateString) return '';
+      try {
+          const year = parseInt(dateString.slice(0, 4));
+          if(isNaN(year)) return '';
+          // ถ้าปีน้อยกว่า 2400 ให้บวก 543 (เพราะเป็น ค.ศ.)
+          // แต่ถ้าปีมันเยอะอยู่แล้ว (User Hack) ก็โชว์เลย
+          const beYear = year < 2400 ? year + 543 : year;
+          return `(พ.ศ. ${beYear})`;
+      } catch(e) { return ''; }
+  }
 
   const isPastDate = () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -160,6 +193,22 @@ export default function ProSalesReport() {
   const removeHistoryRow = (id) => {
     if(!window.confirm('ต้องการลบรายการนี้ใช่ไหม?')) return;
     setHistoryList(prev => prev.filter(item => item.id !== id));
+  };
+
+  // V19 Fix: ใช้ Smart Date Change กับ History Row ด้วย
+  const updateHistoryDate = (id, rawValue) => {
+      let val = rawValue;
+      if (val) {
+          const parts = val.split('-');
+          if (parts.length === 3) {
+              let year = parseInt(parts[0]);
+              if (year > 2400) {
+                  year = year - 543;
+                  val = `${year}-${parts[1]}-${parts[2]}`;
+              }
+          }
+      }
+      setHistoryList(prev => prev.map(item => item.id === id ? { ...item, date: val } : item));
   };
 
   const updateHistoryRow = (id, field, value) => {
@@ -258,8 +307,8 @@ export default function ProSalesReport() {
     const todayGmTotal = group2.reduce((a,b)=>a+Number(b.count || 0),0);
     const todayRaw = {
         rac_fb: group1[0].count, rac_ig: group1[1].count, rac_tt: group1[2].count, rac_line: group1[3].count,
-        gm_fb: group2[0].count, gm_ig: group2[1].count, gm_tt: group2[2].count, gm_line: group2[3].count
-    };
+        gm_fb: group2[0].count, gm_ig: group2[1].count, gm_tt: group2[2].count, gm_line: group2[3].count,
+      };
 
     historyForTable.push({
         date: currentDayFormatted,
@@ -283,9 +332,13 @@ export default function ProSalesReport() {
     };
   }, [date, historyList, group1, group2]);
 
-  // --- Pagination Logic ---
+  // --- Pagination & Sorting (Standard Sort) ---
   const sortedHistoryForDisplay = useMemo(() => {
-      return [...historyList].sort((a,b) => new Date(b.date) - new Date(a.date));
+      return [...historyList].sort((a,b) => {
+          if (!a.date) return -1;
+          if (!b.date) return 1;
+          return new Date(b.date) - new Date(a.date);
+      });
   }, [historyList]);
 
   const totalPages = Math.ceil(sortedHistoryForDisplay.length / itemsPerPage);
@@ -423,7 +476,6 @@ export default function ProSalesReport() {
                     { type: "text", text: `วันนี้: ${todayGm.toLocaleString()}`, color: "#6B7280", size: "xs", align: "end" }
                 ] 
             },
-            { type: "box", layout: "vertical", margin: "sm", contents: createDailyRows(group2, 4, gmAcc) },
             { 
                 type: "box", layout: "vertical", margin: "xxl", alignItems: "center",
                 contents: [
@@ -551,7 +603,7 @@ export default function ProSalesReport() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v16 (Complete)</span>
+               <LayoutDashboard className="text-blue-600"/> Pro Sales Report <span className="text-xs text-gray-400 font-normal">v19 (Smart Year)</span>
             </h1>
             <div className="flex items-center gap-2">
                 <span className={`text-[10px] md:text-xs px-3 py-1 rounded-full font-bold border ${isPastDate() ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
@@ -583,8 +635,10 @@ export default function ProSalesReport() {
                 <input type="text" className="w-full p-2.5 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เช่น Brandname Market" value={companyName} onChange={e => setCompanyName(e.target.value)} />
             </div>
             <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1.5 flex items-center gap-1"><Calendar size={16}/> วันที่รายงาน</label>
-                <input type="date" className={`w-full p-2.5 border rounded-md outline-none ${isPastDate() ? 'border-orange-300 bg-orange-50' : 'border-slate-200'}`} value={date} onChange={e => setDate(e.target.value)} />
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5 flex items-center gap-1"><Calendar size={16}/> วันที่รายงาน <span className="text-xs font-normal text-slate-400">{getBuddhistYear(date)}</span></label>
+                
+                {/* V19 Fix: ใช้ handleSmartDateChange แทน setDate */}
+                <input type="date" className={`w-full p-2.5 border rounded-md outline-none ${isPastDate() ? 'border-orange-300 bg-orange-50' : 'border-slate-200'}`} value={date} onChange={handleSmartDateChange} />
             </div>
         </div>
 
@@ -700,8 +754,9 @@ export default function ProSalesReport() {
                                     </div>
                                     
                                     <div className="mb-3 pr-16">
-                                        <label className="text-xs font-bold text-slate-500 block mb-1">วันที่ของข้อมูล</label>
-                                        <input type="date" className="w-full p-1.5 border rounded text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none" value={row.date} onChange={(e) => updateHistoryRow(row.id, 'date', e.target.value)} />
+                                        <label className="text-xs font-bold text-slate-500 block mb-1">วันที่ของข้อมูล <span className="font-normal text-slate-400">{getBuddhistYear(row.date)}</span></label>
+                                        {/* V19 Fix: ใช้ updateHistoryDate แทน input ปกติ */}
+                                        <input type="date" className="w-full p-1.5 border rounded text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none" value={row.date} onChange={(e) => updateHistoryDate(row.id, e.target.value)} />
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
